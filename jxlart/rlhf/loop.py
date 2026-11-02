@@ -716,4 +716,20 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    code = 0
+    try:
+        main()
+    except SystemExit as e:
+        code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+        if e.code is not None and not isinstance(e.code, int):
+            print(e.code, file=sys.stderr)
+    except BaseException:
+        import traceback
+        traceback.print_exc()
+        code = 1
+    # Everything is saved by now (Run.__exit__ wrote the final status/event). Skip interpreter
+    # teardown: with MLX and PyTorch in one process, native thread pools abort ("terminate called
+    # without an active exception") while daemon threads (UI, taste model) are still alive.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)
