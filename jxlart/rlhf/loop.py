@@ -27,6 +27,7 @@ Stop: STOP file / Ctrl+C. The current RL step finishes and is saved; picks are n
 """
 from __future__ import annotations
 
+import os
 import argparse
 import importlib
 import shutil
