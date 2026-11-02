@@ -2,9 +2,10 @@
 
   python -m jxlart.launch <session-name> <run-dir> -- python -m jxlart.rlhf.loop --run <run-dir> ...
 
-Windows uses psmux (PowerShell), macOS/Linux use tmux. Writes <run-dir>/launch.json, records the
-exit code in <run-dir>/exit_code.txt, and the session closes when the job ends (logs, status and
-events stay in the run dir). Prints attach / status / graceful-stop / resume instructions.
+Windows uses psmux (PowerShell), macOS/Linux use tmux. Writes <run-dir>/launch.json, keeps the
+job's stderr (tracebacks) in <run-dir>/stderr.log, records the exit code in <run-dir>/exit_code.txt,
+and the session closes when the job ends (logs, status and events stay in the run dir).
+Prints attach / status / graceful-stop / resume instructions.
 """
 from __future__ import annotations
 
@@ -41,14 +42,16 @@ def main() -> None:
         indent=1), encoding="utf-8")
     if MUX == "psmux":
         cmdline = " ".join(ps_quote(c) if i else c for i, c in enumerate(cmd))
-        ps = (f"$env:PYTHONUNBUFFERED='1'; $env:PYTHONIOENCODING='utf-8'; & {cmdline}; "
+        err = ps_quote(str(run_dir / "stderr.log"))
+        ps = (f"$env:PYTHONUNBUFFERED='1'; $env:PYTHONIOENCODING='utf-8'; & {cmdline} 2> {err}; "
               f"$c=$LASTEXITCODE; Set-Content -Path {ps_quote(str(exit_file))} -Value $c; exit")
         subprocess.run([MUX, "new-session", "-d", "-s", name, "-c", str(ROOT)], check=True)
         time.sleep(1.5)
         subprocess.run([MUX, "send-keys", "-t", name, ps, "Enter"], check=True)
         stop = f"New-Item {run_dir / 'STOP'}"
     else:
-        sh = (f"export PYTHONUNBUFFERED=1; {shlex.join(cmd)}; "
+        err = shlex.quote(str(run_dir / "stderr.log"))
+        sh = (f"export PYTHONUNBUFFERED=1; {shlex.join(cmd)} 2> >(tee {err} >&2); "
               f"echo $? > {shlex.quote(str(exit_file))}")
         subprocess.run([MUX, "new-session", "-d", "-s", name, "-c", str(ROOT), "bash", "-lc", sh], check=True)
         stop = f"touch {shlex.quote(str(run_dir / 'STOP'))}"

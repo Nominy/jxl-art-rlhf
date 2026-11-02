@@ -1,4 +1,4 @@
-"""Move models and RLHF runs between machines through a private Hugging Face repo.
+"""Move models and RLHF runs between machines through a Hugging Face repo (public by default).
 
   python -m jxlart.hub setup                      # base model files, CLIP, gallery art (once per machine)
   python -m jxlart.hub push --run runs/rlhf-v2    # upload the run (weights, snapshots, picks, images, logs)
@@ -68,13 +68,11 @@ def _state(run: Path) -> dict:
 
 def _remote_hub_json(api, repo: str, name: str) -> dict | None:
     from huggingface_hub import hf_hub_download
-    from huggingface_hub.errors import EntryNotFoundError, RepositoryNotFoundError
-    try:
-        path = hf_hub_download(repo, f"runs/{name}/hub.json", cache_dir=ROOT / "cache" / "hub-meta",
-                               force_download=True)
-    except (EntryNotFoundError, RepositoryNotFoundError):
+    path = f"runs/{name}/hub.json"
+    if not api.file_exists(repo, path):
         return None
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    local = hf_hub_download(repo, path, cache_dir=ROOT / "cache" / "hub-meta", force_download=True)
+    return json.loads(Path(local).read_text(encoding="utf-8"))
 
 
 def setup() -> None:
@@ -96,12 +94,12 @@ def setup() -> None:
         print("ok  libjxl tools")
 
 
-def push(run: Path, repo: str, force: bool) -> None:
+def push(run: Path, repo: str, force: bool, private: bool) -> None:
     from huggingface_hub import HfApi
     if _active(run):
         sys.exit(f"{run} is running here; stop it first (create {run / 'STOP'})")
     api = HfApi()
-    api.create_repo(repo, private=True, exist_ok=True)
+    api.create_repo(repo, private=private, exist_ok=True)  # no-op if it exists; visibility unchanged
     name = run.name
     remote = _remote_hub_json(api, repo, name)
     known = _state(run).get("push_id")
@@ -148,6 +146,7 @@ def main() -> None:
     ap.add_argument("--run", type=Path)
     ap.add_argument("--repo", default=DEFAULT_REPO)
     ap.add_argument("--force", action="store_true", help="push even if the remote changed since the last sync")
+    ap.add_argument("--private", action="store_true", help="create the repo private (counts against HF quota)")
     args = ap.parse_args()
     if args.cmd == "setup":
         return setup()
@@ -155,7 +154,7 @@ def main() -> None:
         ap.error("--run is required")
     run = args.run if args.run.is_absolute() else ROOT / args.run
     if args.cmd == "push":
-        push(run, args.repo, args.force)
+        push(run, args.repo, args.force, args.private)
     else:
         pull(run, args.repo)
 
