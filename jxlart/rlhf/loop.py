@@ -156,14 +156,19 @@ class Loop:
         self.ref = self.B.freeze(self.B.load_policy(step0)[0])
         online = pol / "online.safetensors"
         self.opt_file = pol / ("online_opt" + self.B.OPT_SUFFIX)
+        # which backend/step the optimizer state belongs to; other backends' files go stale when a run
+        # moves between machines (both are synced), so only a matching (backend, step) is trusted
+        self.opt_meta = pol / "online_opt.json"
         self.policy, meta = self.B.load_policy(online if online.exists() else step0)
         self.opt = self.B.new_optimizer(self.policy, args.rl_lr)
         self.step = meta.get("step", 0) if online.exists() else 0
         if online.exists():
-            if self.opt_file.exists():
+            om = json.loads(self.opt_meta.read_text()) if self.opt_meta.exists() else {}
+            if self.opt_file.exists() and om == {"backend": args.backend, "step": self.step}:
                 self.B.load_optimizer(self.opt, self.opt_file)
             else:  # e.g. continuing on another device/backend: weights carry over, Adam state restarts
-                run.event("optimizer_reset", reason=f"no {self.opt_file.name}", backend=args.backend)
+                run.event("optimizer_reset", backend=args.backend, step=self.step,
+                          reason=f"optimizer state is for {om or 'unknown'}, weights are step {self.step}")
             run.event("resume", step=self.step, items=len(self.items), picks=len(self.prefs), backend=args.backend)
         p = self.dir / "cycle.json"
         self.cycle = json.loads(p.read_text()) if p.exists() else {
@@ -454,6 +459,7 @@ class Loop:
     def save_online(self) -> None:
         self.B.save_policy(self.policy, self.dir / "policy" / "online.safetensors", {"step": self.step})
         self.B.save_optimizer(self.opt, self.opt_file)
+        atomic_write_json(self.opt_meta, {"backend": self.a.backend, "step": self.step})
 
     def do_rollback(self, target: int) -> None:
         self.B.load_weights(self.policy, self.dir / "policy" / f"step_{target:05d}.safetensors")
