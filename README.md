@@ -5,6 +5,10 @@ A 3M-parameter language model that writes [JPEG XL art](https://jpegxl.info/art/
 is trained to write *valid random* programs, then tuned toward *beautiful* ones with RLHF on your
 own A/B picks.
 
+- Write-up: [nafty.is-a.dev/posts/jxl-art-rlhf](https://nafty.is-a.dev/posts/jxl-art-rlhf/)
+- Blind test in your browser (the model runs on your device): [nafty.is-a.dev/jxl-blind-test](https://nafty.is-a.dev/jxl-blind-test/)
+- Weights and the full RLHF run (every pick, image and snapshot): [huggingface.co/Nafty/jxl-art-rlhf](https://huggingface.co/Nafty/jxl-art-rlhf)
+
 ## How it works
 
 1. **Data** (`jxlart.build_data`): random programs from the tree grammar plus mutations of
@@ -24,7 +28,7 @@ own A/B picks.
 ```bash
 git clone https://github.com/Nominy/jxl-art-rlhf && cd jxl-art-rlhf
 python -m pip install -r requirements.txt
-hf auth login                       # the run lives in a private Hugging Face repo
+hf auth login                       # only needed to push; the run is public at huggingface.co/Nafty/jxl-art-rlhf
 python -m jxlart.hub setup          # base model files, CLIP, gallery art (art/), checks libjxl tools
 ```
 
@@ -67,6 +71,8 @@ python -m jxlart.rlhf.loop --run runs/rlhf-v2                 # label + train (r
 python -m jxlart.rlhf.loop --run runs/new --sft path/to/sft.safetensors   # start a new run
 python -m jxlart.generate --policy runs/rlhf-v2/policy/online.safetensors --n 128 --out out/latest
 python -m jxlart.novelty --run runs/rlhf-v2 --out reports/novelty        # copying vs the gallery
+python -m jxlart.evaluate --run runs/rlhf-v2 --train data/synth --out reports/eval   # step-by-step metrics
+python -m jxlart.blind_ab --run runs/rlhf-v2 --a step_00000 --b step_00820 --out reports/blind-ab   # blind A/B
 python -m jxlart.build_data --run runs/data --out data/synth --target 24000
 python -m jxlart.sft --run runs/sft --data data/synth --init scratch --gallery-repeat 0
 python -m jxlart.launch <session> <run-dir> -- <command>      # detached psmux/tmux session
@@ -77,6 +83,15 @@ file there (or press Ctrl+C once) for a graceful stop that saves a checkpoint.
 
 Labeling keys: ← / → pick, ↓ equal, `x` both bad, `u` undo, `s` skip, `c` show the recipe.
 
+## In the browser
+
+`web/blind/` is a static page that runs the policy in plain JavaScript (`lib/slm.js`) and libjxl as
+WebAssembly (`vendor/jxl/`, from [hjanuschka/jxl-art](https://github.com/hjanuschka/jxl-art)) to
+play the blind A/B test without a server. `python -m jxlart.export_web --run runs/rlhf-v2 --out
+web/blind/assets` writes the float16 weights and tokenizer table; serve the folder with any static
+server (`python -m http.server -d web/blind`). `tests/test_web_parity.py` and `tests/test_web_tree.py`
+check the JavaScript model, tokenizer, tree parser and codec against the Python pipeline.
+
 ## Credits
 
 - Model architecture and tokenizer: [SupraLabs/Supra2.5-Pico](https://huggingface.co/SupraLabs/Supra2.5-Pico) (Apache-2.0).
@@ -84,3 +99,4 @@ Labeling keys: ← / → pick, ↓ equal, `x` both bad, `u` undo, `s` skip, `c` 
 - Compiler/decoder: [libjxl](https://github.com/libjxl/libjxl) (BSD-3-Clause).
 - Gallery art belongs to its authors (credited in `art/manifest.json`); it is downloaded locally
   by `python -m jxlart.fetch_gallery` and not redistributed here.
+- In-browser libjxl: our Emscripten build of libjxl v0.12.0 (`web/blind/vendor/jxl/`), build script adapted from [hjanuschka/jxl-art](https://github.com/hjanuschka/jxl-art) (Apache-2.0).

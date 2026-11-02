@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blind A/B: JPEG XL art before and after RLHF</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { background: #faf9f5; color: #1f1e1d; font: 18px/1.6 Georgia, serif; max-width: 860px; margin: 3rem auto; padding: 0 1.25rem; }
+  @media (prefers-color-scheme: dark) { body { background: #1f1e1d; color: #eeece2; } }
+</style>
+</head>
+<body>
+<h1>Blind A/B: JPEG XL art before and after RLHF</h1>
+<p>Each round shows two images. Each is a JPEG XL tree program of at most 256 bytes, written by a 3M-parameter model running in your browser.
+One comes from the model before RLHF, the other from the same model after 820 RLHF steps on one person's picks. Pick the one you like; after 10 rounds you see which was which.</p>
+<div id="blind-game"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

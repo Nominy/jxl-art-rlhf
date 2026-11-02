@@ -1,0 +1,21 @@
+#blind-game { --jb-line: color-mix(in srgb, currentColor 14%, transparent); --jb-muted: color-mix(in srgb, currentColor 62%, transparent); margin: 2rem 0; }
+#blind-game button { font: inherit; font-size: 0.95rem; color: inherit; background: transparent; border: 1px solid var(--jb-line); border-radius: 6px; padding: 0.45rem 1rem; cursor: pointer; }
+#blind-game button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 6%, transparent); }
+#blind-game button:disabled { opacity: 0.5; cursor: progress; }
+#blind-game .jb-start { font-size: 1rem; padding: 0.6rem 1.3rem; }
+#blind-game .jb-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin: 1rem 0; }
+#blind-game .jb-note, #blind-game .jb-status { color: var(--jb-muted); font-size: 0.9rem; text-align: center; }
+#blind-game .jb-round, #blind-game .jb-result { text-align: center; }
+#blind-game .jb-result { font-size: 1.15rem; }
+#blind-game .jb-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+#blind-game .jb-slot { aspect-ratio: 1; padding: 0; border: 1px solid transparent; display: flex; align-items: center; justify-content: center; }
+#blind-game .jb-slot:hover { border-color: var(--jb-line); }
+#blind-game img { width: 100%; height: 100%; object-fit: contain; display: block; }
+#blind-game img.jb-small { image-rendering: pixelated; }
+#blind-game .jb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem 1.2rem; margin-top: 1.5rem; }
+#blind-game .jb-row { display: grid; grid-template-columns: 1.1rem 1fr 1fr; gap: 0.4rem; align-items: start; }
+#blind-game .jb-n { color: var(--jb-muted); font-size: 0.85rem; padding-top: 0.3rem; }
+#blind-game .jb-thumb { margin: 0; padding: 4px; border: 1px solid transparent; border-radius: 6px; }
+#blind-game .jb-thumb img { aspect-ratio: 1; image-rendering: pixelated; }
+#blind-game .jb-picked { border-color: currentColor; }
+#blind-game figcaption { font-size: 0.8rem; color: var(--jb-muted); margin-top: 0.3rem; }
