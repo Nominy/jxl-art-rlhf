@@ -116,13 +116,30 @@ def push(run: Path, repo: str, force: bool, private: bool) -> None:
     print(f"pushed {run} -> https://huggingface.co/{repo}/tree/main/runs/{name}  ({info})")
 
 
+def _staged_files(src: Path) -> int:
+    return sum(1 for f in src.rglob("*") if f.is_file()) if src.exists() else 0
+
+
 def pull(run: Path, repo: str) -> None:
     from huggingface_hub import snapshot_download
+    from huggingface_hub.errors import HfHubHTTPError
     if _active(run):
         sys.exit(f"{run} is running here; stop it first (create {run / 'STOP'})")
     name = run.name
     staging = ROOT / "cache" / "hub" / repo.replace("/", "__")
-    snapshot_download(repo, allow_patterns=[f"runs/{name}/**"], local_dir=staging)
+    # A run is thousands of small files; free accounts hit HF's request limit (HTTP 429) part-way.
+    # Finished files stay in `staging`, so each retry resumes; wait out the limit window between tries.
+    for attempt in range(1, 31):
+        try:
+            snapshot_download(repo, allow_patterns=[f"runs/{name}/**"], local_dir=staging, max_workers=4)
+            break
+        except HfHubHTTPError as e:
+            if getattr(e.response, "status_code", None) != 429 or attempt == 30:
+                raise
+            wait = min(300, 60 * attempt)
+            print(f"rate limited by Hugging Face ({_staged_files(staging / 'runs' / name)} files staged); "
+                  f"retry {attempt} in {wait}s", flush=True)
+            time.sleep(wait)
     src = staging / "runs" / name
     if not src.exists():
         sys.exit(f"no runs/{name} in {repo}")
