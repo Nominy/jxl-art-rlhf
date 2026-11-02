@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.tmp
+.hub_state.json
+
+# downloaded / generated / synced through Hugging Face (python -m jxlart.hub ...)
+/art/
+/models/
+/runs/
+/data/
+/cache/
+/out/
+/reports/
+/tmp/
+/tools/bin/
+/tests/fixtures/

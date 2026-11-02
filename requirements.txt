@@ -1,0 +1,12 @@
+numpy
+pillow
+safetensors
+transformers>=4.46
+huggingface_hub>=0.30
+fastapi
+uvicorn
+rich
+# PyTorch: the policy on CUDA (Windows/Linux); CLIP features and the taste model everywhere (CPU/MPS on macOS)
+torch
+# MLX: the policy on Apple silicon (--backend mlx, default on macOS)
+mlx>=0.20; sys_platform == "darwin"
