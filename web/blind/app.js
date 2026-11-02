@@ -1,8 +1,10 @@
 // Blind A/B game: mount into an element with id "blind-game". Pairs come from worker.js; one image of
 // each pair is from the RLHF start checkpoint (step 0), the other from the final one (step 820).
-const ROUNDS = 10;
-const BASE = new URL("./", import.meta.url);
+// Options on the element: data-rounds (default 10), data-autostart (load as soon as it is on screen,
+// unless the browser asks to save data), data-reference (a line shown with the results).
 const root = document.getElementById("blind-game");
+const ROUNDS = Number(root.dataset.rounds) || 10;
+const BASE = new URL("./", import.meta.url);
 
 const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
@@ -35,13 +37,26 @@ function request() {
   queue.push(p);
 }
 
-function start(btn, status) {
-  btn.disabled = true;
+// Same footprint as a round, so the page below does not jump while models load or a pair generates.
+function skeleton(text) {
+  const msg = h("p", { class: "jb-round" }, text);
+  const off = (label) => h("button", { type: "button", disabled: true }, label);
+  view(msg, h("div", { class: "jb-pair" }, h("div", { class: "jb-slot jb-wait" }), h("div", { class: "jb-slot jb-wait" })),
+    h("div", { class: "jb-actions" }, off("← Left"), off("Can't decide"), off("Right →")),
+    h("p", { class: "jb-note" }, "Generated in your browser by a 3M-parameter model; nothing is sent anywhere."));
+  return msg;
+}
+
+let started = false;
+function start() {
+  if (started) return;
+  started = true;
+  const status = skeleton("Loading the model…");
+  const fail = (msg) => view(h("p", { class: "jb-status" }, "Could not start: " + msg));
   worker = new Worker(new URL("worker.js", BASE), { type: "module" });
   worker.onmessage = ({ data }) => {
     if (data.type === "progress") status.textContent = data.text;
     else if (data.type === "ready") {
-      status.textContent = "Generating the first pair…";
       request();
       request();
       play();
@@ -51,10 +66,10 @@ function start(btn, status) {
     } else if (data.type === "error") {
       const w = waiting.get(data.id);
       if (w) { w.reject(new Error(data.message)); waiting.delete(data.id); }
-      else { status.textContent = "Could not start: " + data.message; btn.disabled = false; }
+      else fail(data.message);
     }
   };
-  worker.onerror = (e) => { status.textContent = "Could not start: " + e.message; btn.disabled = false; };
+  worker.onerror = (e) => fail(e.message);
   worker.postMessage({ type: "init", base: BASE.href });
 }
 
@@ -69,7 +84,7 @@ function slot(item) {
 async function play() {
   const pairPromise = queue.shift();
   request();
-  view(h("p", { class: "jb-status" }, `Round ${round + 1} of ${ROUNDS}: generating on your device…`));
+  skeleton(`Round ${round + 1} of ${ROUNDS}: generating on your device…`);
   let pair;
   try {
     pair = await pairPromise;
@@ -140,16 +155,25 @@ function view(...nodes) {
   root.replaceChildren(...nodes.filter((n) => n != null));
 }
 
+// ← / → vote while the game is on screen (ArrowDown is left to page scrolling).
 document.addEventListener("keydown", (e) => {
-  if (!current || e.altKey || e.ctrlKey || e.metaKey) return;
-  const pos = { ArrowLeft: 0, ArrowRight: 1, ArrowDown: -1 }[e.key];
-  if (pos === undefined) return;
+  if (!current || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const pos = { ArrowLeft: 0, ArrowRight: 1 }[e.key];
+  const r = root.getBoundingClientRect();
+  if (pos === undefined || r.bottom < 0 || r.top > innerHeight) return;
   e.preventDefault();
   if (!e.repeat) vote(pos);
 });
 
-{
-  const status = h("p", { class: "jb-note" }, "Downloads two copies of the 3M-parameter model (about 12 MB) and libjxl compiled to WebAssembly (2 MB). Nothing is sent anywhere.");
-  const btn = h("button", { type: "button", class: "jb-start", onclick: () => start(btn, status) }, "Start the blind test");
-  view(h("div", { class: "jb-actions" }, btn), status);
+if ("autostart" in root.dataset && !navigator.connection?.saveData) {
+  skeleton("Starting…");
+  const io = new IntersectionObserver((entries) => {
+    if (!entries.some((en) => en.isIntersecting)) return;
+    io.disconnect();
+    start();
+  });
+  io.observe(root);
+} else {
+  view(h("div", { class: "jb-actions" }, h("button", { type: "button", class: "jb-start", onclick: start }, "Start the blind test")),
+    h("p", { class: "jb-note" }, "Downloads two copies of the 3M-parameter model (about 12 MB) and libjxl compiled to WebAssembly (2 MB). Nothing is sent anywhere."));
 }
